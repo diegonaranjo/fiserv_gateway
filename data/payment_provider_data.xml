@@ -10,8 +10,8 @@
             <field name="display_as">Tarjeta de Crédito/Débito</field>
             
             <!-- Campos requeridos -->
-            <field name="fiserv_store_name">5924073101</field>
-            <field name="fiserv_shared_secret">u8?E-V5ZwR</field>
+            <field name="fiserv_store_name">1234567890</field>
+            <field name="fiserv_shared_secret">1234567890</field>
             
             <!-- Campos específicos de Fiserv -->
             <field name="fiserv_environment">test</field>
