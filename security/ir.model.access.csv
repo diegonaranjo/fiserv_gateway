@@ -1,0 +1,23 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+fiserv_provider_system,fiserv.provider.system,payment.model_payment_provider,base.group_system,1,1,1,1
+fiserv_transaction_system,fiserv.transaction.system,payment.model_payment_transaction,base.group_system,1,1,1,1
+fiserv_token_system,fiserv.token.system,payment.model_payment_token,base.group_system,1,1,1,1
+fiserv_provider_public,fiserv.provider.public,payment.model_payment_provider,base.group_public,1,0,0,0
+fiserv_transaction_public,fiserv.transaction.public,payment.model_payment_transaction,base.group_public,1,1,1,0
+fiserv_token_public,fiserv.token.public,payment.model_payment_token,base.group_public,1,0,0,0
+fiserv_provider_portal,fiserv.provider.portal,payment.model_payment_provider,base.group_portal,1,0,0,0
+fiserv_transaction_portal,fiserv.transaction.portal,payment.model_payment_transaction,base.group_portal,1,1,1,0
+fiserv_token_portal,fiserv.token.portal,payment.model_payment_token,base.group_portal,1,0,0,0
+fiserv_sale_order_public,sale.order.public,sale.model_sale_order,base.group_public,1,0,0,0
+fiserv_sale_order_portal,sale.order.portal,sale.model_sale_order,base.group_portal,1,0,0,0
+access_fiserv_transaction_log,fiserv.transaction.log,model_fiserv_transaction_log,base.group_user,1,1,1,1
+access_sale_order_portal_user,sale.order.portal.user,sale.model_sale_order,base.group_portal,1,1,0,0
+access_payment_transaction_portal_user,payment.transaction.portal.user,payment.model_payment_transaction,base.group_portal,1,1,0,0
+access_fiserv_card_config_admin,fiserv.card.config admin,model_fiserv_card_config,base.group_system,1,1,1,1
+access_fiserv_card_config_public,fiserv.card.config public,model_fiserv_card_config,base.group_public,1,0,0,0
+access_fiserv_card_config_portal,fiserv.card.config portal,model_fiserv_card_config,base.group_portal,1,0,0,0
+access_fiserv_card_config_user,fiserv.card.config user,model_fiserv_card_config,base.group_user,1,1,0,0
+access_fiserv_card_installment_admin,fiserv.card.installment admin,model_fiserv_card_installment,base.group_system,1,1,1,1
+access_fiserv_card_installment_public,fiserv.card.installment public,model_fiserv_card_installment,base.group_public,1,0,0,0
+access_fiserv_card_installment_portal,fiserv.card.installment portal,model_fiserv_card_installment,base.group_portal,1,0,0,0
+access_fiserv_card_installment_user,fiserv.card.installment user,model_fiserv_card_installment,base.group_user,1,1,0,0

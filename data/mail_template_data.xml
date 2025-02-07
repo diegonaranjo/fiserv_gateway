@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Plantilla de Confirmación de Pago -->
+        <record id="email_template_payment_confirmation_fiserv" model="mail.template">
+            <field name="name">Fiserv: Payment Confirmation</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="subject">Payment Confirmation - Order {{ object.name }}</field>
+            <field name="email_from">{{ user.email_formatted }}</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="description">Sent to customer when payment is confirmed</field>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p style="margin: 0px; padding: 0px; font-size: 13px;">
+                        Dear {{ object.partner_id.name }},
+                        <br/><br/>
+                        Your payment for order <strong>{{ object.name }}</strong> has been confirmed.
+                        <br/><br/>
+                        Payment Details:
+                        <br/>
+                        {% if object.fiserv_card_brand %}
+                            <ul>
+                                <li>Card: {{ object.fiserv_card_brand }}</li>
+                                <li>Card Holder: {{ object.fiserv_card_holder }}</li>
+                                <li>Card Number: xxxx-xxxx-xxxx-{{ object.fiserv_card_number }}</li>
+                                {% if object.fiserv_installments > 1 %}
+                                    <li>Installments: {{ object.fiserv_installments }}</li>
+                                    <li>Amount per Installment: 
+                                        {{ format_amount(object.fiserv_installment_amount, object.currency_id) }}
+                                    </li>
+                                    <li>Total with Interest: 
+                                        {{ format_amount(object.fiserv_total_with_interest, object.currency_id) }}
+                                    </li>
+                                {% else %}
+                                    <li>Amount: {{ format_amount(object.amount_total, object.currency_id) }}</li>
+                                {% endif %}
+                            </ul>
+                        {% endif %}
+                        <br/>
+                        You can view your order details by following this link:
+                        <div style="margin: 16px 0px 16px 0px;">
+                            <a href="/my/orders/{{ object.id }}"
+                               style="background-color: #875A7B; padding: 8px 16px 8px 16px; 
+                                      text-decoration: none; color: #fff; border-radius: 5px; 
+                                      font-size:13px;">
+                                View Order
+                            </a>
+                        </div>
+                        Best regards,
+                        <br/>
+                        {{ user.company_id.name }}
+                    </p>
+                </div>
+            </field>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <!-- Plantilla de Pago Rechazado -->
+        <record id="email_template_payment_failed_fiserv" model="mail.template">
+            <field name="name">Fiserv: Payment Failed</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="subject">Payment Failed - Order {{ object.name }}</field>
+            <field name="email_from">{{ user.email_formatted }}</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="description">Sent to customer when payment fails</field>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p style="margin: 0px; padding: 0px; font-size: 13px;">
+                        Dear {{ object.partner_id.name }},
+                        <br/><br/>
+                        We regret to inform you that the payment for order <strong>{{ object.name }}</strong> 
+                        has been declined.
+                        <br/><br/>
+                        {% if object.fiserv_card_brand %}
+                            Payment attempt details:
+                            <ul>
+                                <li>Card: {{ object.fiserv_card_brand }}</li>
+                                <li>Card Holder: {{ object.fiserv_card_holder }}</li>
+                                <li>Amount: {{ format_amount(object.amount_total, object.currency_id) }}</li>
+                            </ul>
+                        {% endif %}
+                        <br/>
+                        You can try again by following this link:
+                        <div style="margin: 16px 0px 16px 0px;">
+                            <a href="/my/orders/{{ object.id }}/payment"
+                               style="background-color: #875A7B; padding: 8px 16px 8px 16px; 
+                                      text-decoration: none; color: #fff; border-radius: 5px; 
+                                      font-size:13px;">
+                                Retry Payment
+                            </a>
+                        </div>
+                        If you need assistance, please don't hesitate to contact us.
+                        <br/><br/>
+                        Best regards,
+                        <br/>
+                        {{ user.company_id.name }}
+                    </p>
+                </div>
+            </field>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <!-- Plantilla de Reembolso -->
+        <record id="email_template_refund_notification_fiserv" model="mail.template">
+            <field name="name">Fiserv: Refund Notification</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="subject">Refund Processed - Order {{ object.name }}</field>
+            <field name="email_from">{{ user.email_formatted }}</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="description">Sent to customer when a refund is processed</field>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p style="margin: 0px; padding: 0px; font-size: 13px;">
+                        Dear {{ object.partner_id.name }},
+                        <br/><br/>
+                        We have processed a refund for your order <strong>{{ object.name }}</strong>.
+                        <br/><br/>
+                        Refund Details:
+                        <ul>
+                            <li>Amount Refunded: {{ format_amount(ctx.get('refund_amount'), object.currency_id) }}</li>
+                            <li>Original Payment Method: {{ object.fiserv_card_brand }}</li>
+                            <li>Transaction ID: {{ object.fiserv_transaction_id }}</li>
+                        </ul>
+                        <br/>
+                        The refund should be reflected in your account within 3-5 business days, 
+                        depending on your bank's processing time.
+                        <br/><br/>
+                        You can view your order details here:
+                        <div style="margin: 16px 0px 16px 0px;">
+                            <a href="/my/orders/{{ object.id }}"
+                               style="background-color: #875A7B; padding: 8px 16px 8px 16px; 
+                                      text-decoration: none; color: #fff; border-radius: 5px; 
+                                      font-size:13px;">
+                                View Order
+                            </a>
+                        </div>
+                        If you have any questions, please don't hesitate to contact us.
+                        <br/><br/>
+                        Best regards,
+                        <br/>
+                        {{ user.company_id.name }}
+                    </p>
+                </div>
+            </field>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+
+        <!-- Plantilla de Notificación de Cuotas -->
+        <record id="email_template_installment_info_fiserv" model="mail.template">
+            <field name="name">Fiserv: Installment Payment Information</field>
+            <field name="model_id" ref="sale.model_sale_order"/>
+            <field name="subject">Payment Plan Details - Order {{ object.name }}</field>
+            <field name="email_from">{{ user.email_formatted }}</field>
+            <field name="partner_to">{{ object.partner_id.id }}</field>
+            <field name="description">Detailed information about installment payments</field>
+            <field name="body_html" type="html">
+                <div style="margin: 0px; padding: 0px;">
+                    <p style="margin: 0px; padding: 0px; font-size: 13px;">
+                        Dear {{ object.partner_id.name }},
+                        <br/><br/>
+                        Here are the details of your installment payment plan for order 
+                        <strong>{{ object.name }}</strong>:
+                        <br/><br/>
+                        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;">
+                            <strong>Payment Plan Details:</strong>
+                            <ul>
+                                <li>Original Amount: 
+                                    {{ format_amount(object.amount_total, object.currency_id) }}
+                                </li>
+                                <li>Number of Installments: {{ object.fiserv_installments }}</li>
+                                <li>Amount per Installment: 
+                                    {{ format_amount(object.fiserv_installment_amount, object.currency_id) }}
+                                </li>
+                                <li>Interest Amount: 
+                                    {{ format_amount(object.fiserv_interest_amount, object.currency_id) }}
+                                </li>
+                                <li>Total Amount with Interest: 
+                                    {{ format_amount(object.fiserv_total_with_interest, object.currency_id) }}
+                                </li>
+                            </ul>
+                        </div>
+                        <br/>
+                        <small style="color: #6c757d;">
+                            Note: The installments will be charged to your card 
+                            {{ object.fiserv_card_brand }} (ending in {{ object.fiserv_card_number }}) 
+                            according to your card's billing cycle.
+                        </small>
+                        <br/><br/>
+                        You can view your complete order details here:
+                        <div style="margin: 16px 0px 16px 0px;">
+                            <a href="/my/orders/{{ object.id }}"
+                               style="background-color: #875A7B; padding: 8px 16px 8px 16px; 
+                                      text-decoration: none; color: #fff; border-radius: 5px; 
+                                      font-size:13px;">
+                                View Order
+                            </a>
+                        </div>
+                        If you have any questions about your payment plan, please contact us.
+                        <br/><br/>
+                        Best regards,
+                        <br/>
+                        {{ user.company_id.name }}
+                    </p>
+                </div>
+            </field>
+            <field name="lang">{{ object.partner_id.lang }}</field>
+            <field name="auto_delete" eval="True"/>
+        </record>
+    </data>
+</odoo>

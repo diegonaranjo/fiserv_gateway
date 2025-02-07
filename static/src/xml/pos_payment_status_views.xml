@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-name="fiserv_gateway.PaymentScreenDue" t-inherit="point_of_sale.PaymentScreenDue" t-inherit-mode="extension">
+        <xpath expr="//div[hasclass('total')]" position="after">
+            <div class="fiserv-payment-options mt-3" t-if="state.isVisible">
+                <!-- Card Selector -->
+                <div class="payment-card-selector px-3">
+                    <label class="control-label fw-bold">Tarjetas</label>
+                    <select class="form-select mt-2" t-on-change="(ev) => fiservHandler.onCardBrandChange(ev)">
+                        <option value="">Elija la tarjeta</option>
+                        <t t-foreach="state.cardBrands" t-as="brand" t-key="brand.id">
+                            <option t-att-value="brand.id">
+                                <t t-esc="brand.name"/>
+                            </option>
+                        </t>
+                    </select>
+                </div>
+                
+                <!-- Installment Selector -->
+                <div class="payment-installment-selector px-3 mt-3" 
+                     t-if="state.selectedCardBrand">
+                    <label class="control-label fw-bold">Cuotas</label>
+                    <select class="form-select mt-2" t-on-change="(ev) => fiservHandler.onInstallmentChange(ev)">
+                        <option value="">Elija las cuotas</option>
+                        <t t-foreach="state.installmentOptions" t-as="option" t-key="option.installments">
+                            <option t-att-value="option.installments">
+                                <t t-esc="option.label"/>
+                            </option>
+                        </t>
+                    </select>
+                </div>
+
+                <!-- Payment Information -->
+                <div t-if="state.totalWithInterest > 0" class="payment-info px-3 mt-3">
+                    <div class="alert alert-info">
+                        <!-- Original Price -->
+                        <div class="original-price d-flex justify-content-between">
+                            <span class="fw-bold">Precio en efectivo:</span>
+                            <span t-esc="_formatCurrency(state.originalTotal || currentOrder.get_total_with_tax())"/>
+                        </div>
+                        <hr class="my-2"/>
+                        <!-- Installment Info -->
+                        <div class="installment-info d-flex justify-content-between">
+                            <span class="fw-bold">
+                                <t t-if="state.displayInstallments === 'Plan Z'">Total Plan Z:</t>
+                                <t t-else="">Valor de cuota:</t>
+                            </span>
+                            <span t-esc="_formatCurrency(state.installmentAmount)"/>
+                        </div>
+                        <!-- Total with Interest -->
+                        <div class="total-info d-flex justify-content-between mt-2">
+                            <span class="fw-bold">Total con interés:</span>
+                            <span t-esc="_formatCurrency(state.totalWithInterest)"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+    </t>
+</templates>

@@ -1,0 +1,27 @@
+.fiserv-config-editor {
+    min-height: 500px;
+    
+    .ace_editor {
+        position: relative !important;
+        min-height: 500px !important;
+        width: 60% !important;
+        
+        .ace_content {
+            min-height: 500px !important;
+            padding: 10px;
+        }
+        
+        .ace_text-layer {
+            font-family: monospace;
+            tab-size: 4;
+        }
+        
+        .ace_line {
+            height: 20px !important;
+        }
+        
+        .ace_scroller {
+            overflow: auto !important;
+        }
+    }
+}

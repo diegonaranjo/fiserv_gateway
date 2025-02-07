@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Fiserv Provider configuration -->
+    <record id="payment_provider_form_view_inherit_fiserv" model="ir.ui.view">
+        <field name="name">payment.provider.form.inherit.fiserv</field>
+        <field name="model">payment.provider</field>
+        <field name="inherit_id" ref="payment.payment_provider_form"/>
+        <field name="arch" type="xml">
+            <group name="provider_credentials" position='inside'>
+                <group invisible="code != 'fiserv'" name="fiserv_configuration">
+                    <group string="Credenciales" name="fiserv_credentials" groups="base.group_system">
+                        <field name="fiserv_store_name" required="code == 'fiserv'"/>
+                        <field name="fiserv_shared_secret" password="True" required="code == 'fiserv'"/>
+                    </group>
+                    
+                    <group string="Opciones" name="fiserv_settings" groups="account.group_account_manager">
+                        <field name="fiserv_environment" widget="radio" required="code == 'fiserv'"/>
+                        <field name="fiserv_enable_3ds"/>
+                        <field name="fiserv_checkout_mode" widget="selection"/>
+                        <field name="fiserv_payment_mode" widget="selection"/>
+                        <field name="fiserv_dynamic_descriptor" placeholder="Nombre en el resumen (max. 25 caracteres)"/>
+                    </group>  
+                 
+                </group>
+            </group>
+
+            <!-- URLs and Cards in the settings tab -->
+            <xpath expr="//notebook/page[@name='configuration']" position="inside">
+                <group invisible="code != 'fiserv'" name="fiserv_advanced_config">
+                    <group string="URLs de redirección" name="fiserv_urls" groups="base.group_system">
+                        <field name="fiserv_success_url" widget="url" placeholder="https://"/>
+                        <field name="fiserv_fail_url" widget="url" placeholder="https://"/>
+                        <field name="fiserv_notification_url" widget="url" placeholder="https://"/>
+                    </group>   
+
+                    <group string="Tarjetas" name="fiserv_cards" groups="account.group_account_manager">
+                        <field name="fiserv_enable_installments"/>
+                        <field name="fiserv_card_brands" 
+                            widget="many2many_tags" 
+                            options="{'no_create': True, 'no_edit': True}"
+                            invisible="not fiserv_enable_installments"/>
+
+                        <div class="alert alert-info mt-3" role="alert" invisible="not fiserv_enable_installments">
+                            <p class="mb-0">
+                                <i class="fa fa-info-circle me-2"/>
+                                Configure las tarjetas y sus planes de cuotas desde el menú Fiserv > Configuración de Tarjetas
+                            </p>
+                        </div>
+                    </group> 
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- List view for card configuration -->
+    <record id="view_fiserv_card_config_list" model="ir.ui.view">
+        <field name="name">fiserv.card.config.list</field>
+        <field name="model">fiserv.card.config</field>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <list string="Tarjetas Fiserv">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="credit"/>
+                <field name="debit"/>
+                <field name="installments"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form view for card configuration -->
+    <record id="view_fiserv_card_config_form" model="ir.ui.view">
+        <field name="name">fiserv.card.config.form</field>
+        <field name="model">fiserv.card.config</field>
+        <field name="arch" type="xml">
+            <form string="Configuración de Tarjeta">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="code"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group>
+                            <field name="credit"/>
+                            <field name="debit"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Cuotas" name="installments">
+                            <field name="installments">
+                                <kanban>
+                                    <templates>
+                                        <t t-name="kanban-box">
+                                            <div class="oe_kanban_global_click">
+                                                <div class="o_kanban_record_title">
+                                                    <strong><field name="installments"/> Cuota(s)</strong>
+                                                </div>
+                                                <div>
+                                                    <span>Tasa de Interés: <field name="interest_rate"/>%</span>
+                                                </div>
+                                                <div>
+                                                    <span>Valor a Enviar: <field name="installment_to_send"/></span>
+                                                </div>
+                                                <div>
+                                                    <span>Activo: <field name="active"/></span>
+                                                </div>
+                                            </div>
+                                        </t>
+                                    </templates>
+                                </kanban>
+                            </field>
+                        </page>
+                        <page string="Notas" name="notes">
+                            <field name="note" placeholder="Agregar notas adicionales..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_fiserv_card_installment" model="ir.actions.act_window">
+        <field name="name">Cuotas</field>
+        <field name="res_model">fiserv.card.installment</field>
+        <field name="view_mode">kanban,tree,form</field>
+    </record>
+
+    <!-- Installments configuration window-->
+    <record id="view_fiserv_card_installment_form" model="ir.ui.view">
+        <field name="name">fiserv.card.installment.form</field>
+        <field name="model">fiserv.card.installment</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="card_config_id"/>
+                        <field name="installments"/>
+                        <field name="interest_rate"/>
+                        <field name="installment_to_send"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action for card configuration -->
+    <record id="action_fiserv_card_config" model="ir.actions.act_window">
+        <field name="name">Configuración de Tarjetas</field>
+        <field name="res_model">fiserv.card.config</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_fiserv_card_config_list"/>
+    </record>
+        
+    <!-- Search view -->
+    <record id="payment_provider_search" model="ir.ui.view">
+        <field name="name">Fiserv Provider Search</field>
+        <field name="model">payment.provider</field>
+        <field name="inherit_id" ref="payment.payment_provider_search"/>
+        <field name="arch" type="xml">
+            <field name="name" position="after">
+                <field name="fiserv_store_name"/>
+                <field name="fiserv_environment"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Cards and Installments Configuration Menu in Sales -->
+    <menuitem id="menu_fiserv_card_config"
+              name="Tarjetas y Cuotas"
+              parent="sale.payment_menu"
+              action="action_fiserv_card_config"
+              sequence="20"/>
+
+</odoo>

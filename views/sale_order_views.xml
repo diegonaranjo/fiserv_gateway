@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Formulario de Orden de Venta -->
+    <record id="view_order_form_inherit_fiserv" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.fiserv</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Agregar widget de estado de pago -->
+            <xpath expr="//field[@name='payment_term_id']" position="after">
+                <field name="payment_transaction_id" invisible="1"/>
+                <field name="payment_status" widget="fiserv_payment_status" options="{'no_edit': True}" />
+            </xpath>
+
+            <!-- Agregar botón de información de pago -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+               <button name="action_fiserv_payment_info" type="object"
+                        class="oe_stat_button" icon="fa-credit-card"
+                        attrs="{'invisible': [('fiserv_payment_data', '=', False)]}">
+                    <field name="fiserv_card_brand" string="Payment" widget="statinfo"/>
+                </button>
+
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Vista de árbol de Órdenes de Venta -->
+    <record id="view_order_tree_inherit_fiserv" model="ir.ui.view">
+        <field name="name">sale.order.tree.inherit.fiserv</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_tree"/>
+        <field name="arch" type="xml">
+            <field name="state" position="before">
+                <field name="fiserv_card_brand" optional="show"/>
+                <field name="fiserv_installments" optional="show"/>
+                <field name="fiserv_total_with_interest" optional="hide"/>
+            </field>
+        </field>
+    </record>
+
+    <!-- Vista de búsqueda de Órdenes de Venta -->
+    <record id="view_sales_order_filter_inherit_fiserv" model="ir.ui.view">
+        <field name="name">sale.order.search.inherit.fiserv</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//filter[@name='my_sale_orders_filter']" position="after">
+                <separator/>
+                <filter string="Fiserv Payments" name="fiserv_payments" 
+                        domain="[('fiserv_payment_data', '!=', False)]"/>
+                <filter string="With Installments" name="with_installments" 
+                        domain="[('fiserv_installments', '>', 1)]"/>
+            </xpath>
+            <xpath expr="//group" position="inside">
+                <filter string="Card Brand" name="group_by_card_brand" 
+                        context="{'group_by': 'fiserv_card_brand'}"/>
+                <filter string="Installments" name="group_by_installments" 
+                        context="{'group_by': 'fiserv_installments'}"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Vista Kanban de Órdenes de Venta -->
+    <record id="view_order_kanban_inherit_fiserv" model="ir.ui.view">
+        <field name="name">sale.order.kanban.inherit.fiserv</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_sale_order_kanban"/>
+        <field name="arch" type="xml">
+            <field name="activity_state" position="after">
+                <field name="fiserv_card_brand"/>
+                <field name="fiserv_installments"/>
+                <field name="fiserv_total_with_interest"/>
+            </field>
+            <xpath expr="//div[hasclass('oe_kanban_details')]" position="inside">
+                <div t-if="record.fiserv_card_brand.raw_value" class="mt-2">
+                    <strong>Payment:</strong>
+                    <field name="fiserv_card_brand"/>
+                    <t t-if="record.fiserv_installments.raw_value > 1">
+                        (<field name="fiserv_installments"/> installments)
+                    </t>
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Template para Widget de Estado de Pago -->
+    <template id="fiserv_payment_status_template" name="Fiserv Payment Status Template">
+        <div t-name="FiservPaymentStatus" class="o_fiserv_payment_status">
+            <div class="d-flex align-items-center">
+                <i t-if="card_brand" t-attf-class="fa fa-cc-#{card_brand.toLowerCase()} mr-2"/>
+                <span t-esc="status_message"/>
+            </div>
+            <div t-if="installments > 1" class="text-muted small">
+                <span t-esc="installment_info"/>
+            </div>
+        </div>
+    </template>
+
+    <!-- Menú de Configuración de Pagos -->
+    <menuitem id="menu_fiserv_payment_config"
+              name="Fiserv Payments"
+              parent="account.menu_finance_configuration"
+              sequence="15"
+              groups="account.group_account_manager"/>
+
+    <!-- QWeb Reports -->
+    <template id="report_saleorder_document_inherit_fiserv" inherit_id="sale.report_saleorder_document">
+        <xpath expr="//div[@class='page']/div[hasclass('row')]" position="after">
+            <div t-if="doc.fiserv_payment_data" class="row mt-4">
+                <div class="col-12">
+                    <div class="alert alert-info mb-0">
+                        <strong>Payment Information:</strong>
+                        <span t-field="doc.fiserv_card_brand"/> - 
+                        <t t-if="doc.fiserv_installments > 1">
+                            <span t-field="doc.fiserv_installments"/> installments of 
+                            <span t-field="doc.fiserv_installment_amount" 
+                                  t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                            <br/>
+                            <small class="text-muted">
+                                Total with interest: 
+                                <span t-field="doc.fiserv_total_with_interest" 
+                                      t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                            </small>
+                        </t>
+                        <t t-else="">
+                            Single payment
+                        </t>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+    </template>
+</odoo>

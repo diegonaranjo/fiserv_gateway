@@ -1,0 +1,87 @@
+
+.o_fiserv_payment_form {
+    position: relative;
+    min-height: 150px;
+
+    // Estilo para los selects
+    .form-select {
+        border: 1px solid #ddd;
+        
+        &:focus {
+            border-color: #8a2be2;
+            box-shadow: 0 0 0 1px rgba(138, 43, 226, 0.2);
+        }
+    }
+
+    // Panel de información de cuotas
+    [name="fiserv_installment_info"] {
+        border: 2px dashed #8a2be2;
+        background-color: #f8f8f8 !important;
+        padding: 15px;
+        margin-top: 1rem;
+
+        .text-muted {
+            color: #666 !important;
+        }
+
+        span[name="installment-amount"],
+        span[name="total-with-interest"] {
+            color: #000000;
+        }
+
+        p {
+            margin: 8px 0;
+
+            &.text-muted.small {
+                font-size: 0.9em;
+            }
+        }
+    }
+
+    // Mensaje de error
+    .alert-danger {
+        border: 1px solid #dc3545;
+        background-color: #fff;
+        color: #dc3545;
+    }
+
+    // Loading spinner
+    .fiserv-loader {
+        .spinner-border {
+            border-color: #8a2be2;
+            border-right-color: transparent;
+        }
+    }
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.fiserv-debug-panel {
+    font-family: monospace;
+    font-size: 0.9rem;
+    
+    code {
+        background: #f8f9fa;
+        padding: 0.2rem 0.4rem;
+        border-radius: 3px;
+    }
+
+    .table {
+        font-size: 0.85rem;
+        
+        th, td {
+            padding: 0.5rem;
+        }
+        
+        th {
+            background: #f8f9fa;
+        }
+    }
+}
+
+.fiserv-redirect-form {
+    position: relative;
+}

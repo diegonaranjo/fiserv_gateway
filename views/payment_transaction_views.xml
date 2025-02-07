@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Vista de Búsqueda -->
+    <record id="payment_transaction_search_fiserv" model="ir.ui.view">
+        <field name="name">payment.transaction.search.fiserv</field>
+        <field name="model">payment.transaction</field>
+        <field name="inherit_id" ref="payment.payment_transaction_search"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <filter string="Con Cuotas" name="with_installments" 
+                        domain="[('provider_id.fiserv_enable_installments', '=', True)]"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Vista de Lista -->
+    <record id="payment_transaction_list_fiserv" model="ir.ui.view">
+        <field name="name">payment.transaction.list.fiserv</field>
+        <field name="model">payment.transaction</field>
+        <field name="inherit_id" ref="payment.payment_transaction_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='reference']" position="after">
+                <field name="provider_id" optional="show"/>
+                <field name="amount" widget="monetary" optional="show"/>
+                <field name="currency_id" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Detalles del pago en la vista Admin de facturación -->
+    <record id="payment_transaction_form_fiserv" model="ir.ui.view">
+        <field name="name">payment.transaction.form.fiserv</field>
+        <field name="model">payment.transaction</field>
+        <field name="inherit_id" ref="payment.payment_transaction_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Detalles del pago con tarjeta" invisible="provider_code != 'fiserv'">
+                    <group>
+                        <field name="reference" readonly="1"/>
+                        <field name="provider_id" readonly="1"/>
+                        <field name="amount" readonly="1"/>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="fiserv_card_holder" readonly="1"/>
+                        <field name="fiserv_card_number" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="fiserv_txn_id" readonly="1"/>
+                        <field name="fiserv_approval_code" readonly="1"/>
+                        <field name="fiserv_installments" readonly="1" invisible="fiserv_installments == 1"/>
+                        <field name="fiserv_total_with_interest" readonly="1" invisible="fiserv_installments == 1"/>
+                        <field name="fiserv_interest_amount" readonly="1" invisible="fiserv_installments == 1"/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+   <!-- Detalles del pago en la vista Admin de la orden -->
+    <record id="view_order_form_fiserv_payment" model="ir.ui.view">
+        <field name="name">sale.order.form.fiserv.payment</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page name="payment_details" string="Detalles del pago" invisible="not transaction_ids">
+                    <group>
+                        <group string="Información de la tarjeta">
+                        
+                            <field name="fiserv_card_brand" readonly="1"/>
+                            <field name="fiserv_card_holder" readonly="1"/>
+                            <field name="fiserv_card_number" readonly="1"/>
+                            <field name="fiserv_transaction_id" readonly="1"/>
+                        </group>
+                        <group string="información del pago">
+                            <field name="payment_status" readonly="1"/>
+                            <field name="fiserv_installments" readonly="1"/>
+                            <field name="fiserv_interest_amount" readonly="1"/>
+                            <field name="fiserv_total_with_interest" 
+                                readonly="1" 
+                                widget="monetary"
+                                invisible="fiserv_installments &lt;= 1"/>                              
+                        </group>
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+</odoo>

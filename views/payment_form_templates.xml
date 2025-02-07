@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Heredar del formulario de pago principal -->
+    <template id="fiserv_payment_method_form" inherit_id="payment.method_form">
+            <xpath expr="//div[@name='o_payment_inline_form']" position="inside">
+                <t t-if="provider_sudo.code == 'fiserv'">
+                    <div class="fiserv-payment-container" 
+                        t-att-data-provider-id="provider_sudo.id"
+                        t-att-data-currency-id="provider_sudo.company_id.currency_id.id"
+                        t-att-data-currency-name="provider_sudo.company_id.currency_id.name">
+                        
+                        <!-- Payment Option -->
+                        <div class="payment-option-selector d-flex align-items-center">
+                            <input type="radio"
+                                name="o_payment_radio"
+                                class="form-check-input me-2"
+                                t-att-id="'o_payment_radio_%s' % provider_sudo.id"
+                                t-att-value="provider_sudo.id"
+                                t-att-data-payment-option-id="provider_sudo.id"
+                                t-att-data-provider-code="provider_sudo.code"
+                                t-att-data-amount="amount"
+                                t-att-data-payment-method-code="'card'"
+                                t-att-checked="provider_sudo.id == checked_provider_id"/>
+                            
+                            <label t-att-for="'o_payment_radio_%s' % provider_sudo.id"
+                                class="form-check-label d-flex align-items-center mb-0">
+                                <img t-if="provider_sudo.image_128"
+                                    t-att-src="image_data_uri(provider_sudo.image_128)"
+                                    class="rounded me-2"
+                                    width="32"
+                                    height="24"
+                                    alt="Provider Logo"/>
+                                <span t-esc="provider_sudo.display_as or provider_sudo.name"/>
+                            </label>
+                        </div>
+                        
+                        <!-- Payment Form -->
+                        <div class="o_fiserv_payment_form mt-3 ps-3 d-none">
+                            <div name="fiserv_redirect_container" class="fiserv-redirect-container"></div>
+                            
+                            <!-- Card Selection Form -->
+                            <div class="fiserv-card-form">
+                                <t t-call="fiserv_gateway.fiserv_inline_form"/>
+                            </div>
+                            
+                            <!-- Loading State -->
+                            <div class="fiserv-loading-state d-none">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </xpath>
+        </template>
+
+    <!-- Template para el formulario inline -->
+    <template id="fiserv_inline_form">
+        <form class="fiserv-payment-form" autocomplete="off">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="fw-bold mb-2 required" for="o_fiserv_card_brand">Card Type</label>
+                    <select id="o_fiserv_card_brand"
+                            name="o_fiserv_card_brand" 
+                            class="form-select" 
+                            required="1"
+                            t-att-data-amount="amount"
+                            t-att-data-provider-id="provider_sudo.id"
+                            t-att-data-currency="provider_sudo.company_id.currency_id.name">
+                        <option value="">Select Card</option>
+                        <t t-foreach="provider_sudo._get_supported_card_types().items()" t-as="card_type">
+                            <option t-att-value="card_type[0]" 
+                                    t-att-data-credit="card_type[1].get('credit')"
+                                    t-att-data-debit="card_type[1].get('debit')">
+                                <t t-esc="card_type[1].get('name')"/>
+                            </option>
+                        </t>
+                    </select>
+                    <div class="invalid-feedback">Please select a card type</div>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="fw-bold mb-2 required" for="o_fiserv_installments">Installments</label>
+                    <select id="o_fiserv_installments"
+                            name="o_fiserv_installments" 
+                            class="form-select"
+                            disabled="disabled"
+                            t-att-data-original-amount="amount">
+                        <option value="">Select Installments</option>
+                    </select>
+                    <div class="invalid-feedback">Please select number of installments</div>
+                </div>
+            </div>
+
+            <!-- Installment Information Panel -->
+            <div name="fiserv_installment_info" class="payment-info-panel mt-3 d-none">
+                <div class="alert alert-info mb-0">
+                    <div class="row">
+                        <div class="col-12">
+                            <p class="mb-1">
+                                <span class="text-muted">Installment Amount:</span> 
+                                <span class="fw-bold" name="installment-amount"></span>
+                            </p>
+                            <p class="mb-1">
+                                <span class="text-muted">Interest Rate:</span>
+                                <span name="interest-rate"></span>%
+                            </p>
+                            <p class="mb-0">
+                                <span class="text-muted">Total with Interest:</span>
+                                <span class="fw-bold" name="total-with-interest"></span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hidden Fields -->
+            <input type="hidden" name="o_payment_provider_id" t-att-value="provider_sudo.id"/>
+            <input type="hidden" name="o_fiserv_total_with_interest"/>
+            <input type="hidden" name="o_fiserv_installments_to_send"/>
+            <input type="hidden" name="o_fiserv_interest_rate"/>
+            
+            <!-- Error Messages -->
+            <div class="alert alert-danger mt-3 d-none" role="alert"></div>
+        </form>
+    </template>
+
+    <!-- Template para mostrar el estado del pago al cliente en el detalle del pedido-->
+    <template id="payment_status_display" inherit_id="payment.state_header">
+        <xpath expr="//div[@id='o_payment_status_message']" position="after">
+            <t t-if="tx.provider_code == 'fiserv' and tx.state == 'done'">
+                <div class="mt-3 border-top pt-3">
+                    <h6 class="mb-3">Detalles del pago con tarjeta:</h6>
+                    <t t-if="tx.fiserv_card_brand">
+                        <p class="mb-1">
+                            <span class="text-muted">Tarjeta:</span>
+                            <span class="ms-2">
+                                <t t-esc="tx.get_card_brand_display()"/>
+                                <t t-if="tx.fiserv_card_number">
+                                    (**** <t t-esc="tx.fiserv_card_number"/>)
+                                </t>
+                            </span>
+                        </p>
+                        <p t-if="tx.fiserv_card_holder" class="mb-1">
+                            <span class="text-muted">Titular:</span>
+                            <span class="ms-2">
+                                <t t-esc="tx.fiserv_card_holder"/>
+                            </span>
+                        </p>
+                    </t>
+                    <t t-if="tx.fiserv_installments > 1">
+                        <p class="mb-1">
+                            <span class="text-muted">Installments:</span>
+                            <span class="ms-2">
+                                <t t-esc="tx.fiserv_installments"/> Installments 
+                                <span t-esc="tx.currency_id.symbol"/>
+                                <span t-esc="'%.2f' % (tx.fiserv_total_with_interest / tx.fiserv_installments)"/>
+                            </span>
+                        </p>
+                        <p class="mb-0">
+                            <span class="text-muted">Total con interés:</span>
+                            <span class="ms-2">
+                                <span t-esc="tx.currency_id.symbol"/>
+                                <span t-esc="'%.2f' % tx.fiserv_total_with_interest"/>
+                            </span>
+                        </p>
+                    </t>
+                </div>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- Muestra alerta cuando el pago con Fiserv es fallido y agrega botón de detalles -->
+    <template id="payment_status_message" inherit_id="website_sale.confirmation" name="Fiserv Payment Status">
+        <xpath expr="//t[@t-call='website_sale.payment_confirmation_status']" position="after">
+            <!-- Success message -->
+            <t t-if="tx_sudo.provider_code == 'fiserv' and tx_sudo.state == 'done'">
+                <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                    <strong>¡Pago realizado con éxito!</strong>
+                    <p>Tu pedido ha sido confirmado y será procesado a la brevedad.</p>
+                </div>
+            </t>
+
+            <!-- Agrega el botón de ver detalles -->
+            <div class="mt-4 text-center">
+                <a t-att-href="'/my/orders/%s' % order.id" class="btn btn-primary text-lg">
+                    Ver detalles del pedido
+                </a>
+            </div>
+            
+            <!-- Mensaje de error existente -->
+            <t t-if="tx_sudo.provider_code == 'fiserv' and tx_sudo.state in ['error', 'cancel']">
+                <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                    <strong>El pago falló por algún valor ingresado erróneamente:</strong>
+                    <p t-esc="tx_sudo.fiserv_error_message"/>
+                    <div class="mt-3">
+                        <a href="/shop/payment" class="btn btn-primary">Intentar nuevamente</a>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            </t>
+        </xpath>
+    </template>
+</odoo>

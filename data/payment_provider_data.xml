@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Configuración del método de pago Fiserv -->
+        <record id="payment_provider_fiserv" model="payment.provider">
+            <field name="name">Fiserv</field>
+            <field name="code">fiserv</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="state">test</field>
+            <field name="display_as">Tarjeta de Crédito/Débito</field>
+            
+            <!-- Campos requeridos -->
+            <field name="fiserv_store_name">5924073101</field>
+            <field name="fiserv_shared_secret">u8?E-V5ZwR</field>
+            
+            <!-- Campos específicos de Fiserv -->
+            <field name="fiserv_environment">test</field>
+            <field name="fiserv_enable_3ds">True</field>
+            <field name="fiserv_enable_installments">True</field>
+            <field name="fiserv_checkout_mode">combinedpage</field>
+            <field name="fiserv_payment_mode">payonly</field>
+            
+            <!-- Descripción -->
+            <field name="description">Fiserv (Firstdata) - Pagos con tarjetas en Argentina</field>
+
+        </record>
+        
+        <record id="seq_payment_provider_reference" model="ir.sequence">
+            <field name="name">Payment Provider Reference</field>
+            <field name="code">payment.provider.reference</field>
+            <field name="prefix">PAY/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="company_id" eval="False"/>
+        </record>
+        <record id="seq_payment_transaction_fiserv" model="ir.sequence">
+            <field name="name">Fiserv Transaction Sequence</field>
+            <field name="code">payment.transaction.fiserv</field>
+            <field name="prefix">TF</field>
+            <field name="padding">6</field>
+            <field name="company_id" eval="False"/>
+        </record>
+    </data>
+</odoo>
