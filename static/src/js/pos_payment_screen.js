@@ -14,6 +14,7 @@ class FiservPaymentHandler {
         this.pos = screen.pos;
         this.currentOrder = screen.currentOrder;
         this.env = screen.env;
+        this.originalCardsMethodTotal = 0;
     }
 
     // Getters for commonly accessed properties
@@ -22,7 +23,11 @@ class FiservPaymentHandler {
     }
 
     get selectedPaymentLine() {
-        return this.currentOrder?.selected_paymentline || null;
+        const line = this.currentOrder?.selected_paymentline || null;
+        if (!line) {
+            return null;
+        }
+        return line;
     }
 
     /**
@@ -39,7 +44,30 @@ class FiservPaymentHandler {
      */
     async initialize() {
         await this._loadFiservData();
+
+        this.screen.state.originalOrderTotal = this.currentOrder?.get_total_with_tax() || 0;
+
+        // We save the original amount of the payment method here
+        this.originalCardsMethodTotal = this.baseAmount;
+
+        // Initial order log
+        console.log('💰 Initial Order Total:', {
+            originalCardsMethodTotal: this.originalCardsMethodTotal,
+            originalOrderTotal: this.screen.state.originalOrderTotal,
+            currentTotal: this.currentOrder?.get_total_with_tax()
+        });
+        // Show payment interface
         this.screen.state.isVisible = true;
+    }
+
+    /**
+     *  Retrieves the amount from the payment method.
+     */
+    get baseAmount() {
+        const cardPaymentLine = this.currentOrder?.payment_ids.find(
+            line => line.payment_method_id?.type === 'bank'
+        );
+        return cardPaymentLine?.get_amount() || 0;
     }
 
     /**
@@ -54,13 +82,13 @@ class FiservPaymentHandler {
                 throw new Error('Invalid card brands response format');
             }
 
-            // Solo actualizamos el estado
+            // We only update the status
             this.screen.state.cardBrands = data.map(brand => ({
                 id: brand[0],  // code
                 name: brand[1] // name
             }));
 
-            // Actualizamos la visibilidad
+            // We update visibility
             this.screen.state.isVisible = true;
 
         } catch (error) {
@@ -76,39 +104,69 @@ class FiservPaymentHandler {
      */
     async onCardBrandChange(ev) {
         const cardBrand = ev.target.value;
+
+        // First reset all state and prices
+        this._resetState();
         this._resetPrices();
+
+        // If no card brand is selected, end here
         if (!cardBrand) {
-            this._resetState();
             return;
         }
 
         try {
-            const amount = this.currentOrder.get_total_with_tax();
+            const order = this.currentOrder;
+            if (!order) throw new Error('No active order');
+
+            // Get current amount
+            let currentAmount = this.baseAmount;
+
+            // If base amount differs from original, use original
+            if (this.state.originalCardsMethodTotal &&
+                this.state.originalCardsMethodTotal !== currentAmount) {
+                currentAmount = this.state.originalCardsMethodTotal;
+            }
+
+            // Reset payment line to correct amount
+            const paymentLine = this.selectedPaymentLine;
+            if (paymentLine) {
+                paymentLine.set_amount(currentAmount);
+            }
+
+            if (!currentAmount || currentAmount <= 0) {
+                throw new Error('Invalid payment amount');
+            }
+
             const response = await rpc('/payment/fiserv/get_installments', {
                 card_brand: cardBrand,
-                amount: parseFloat(amount)
+                amount: parseFloat(currentAmount)
             });
 
-            if (response?.success && Array.isArray(response.options)) {
-                this.state.selectedCardBrand = cardBrand;
-                this.state.installmentOptions = this._formatInstallmentOptions(response.options);
-                this.screen.render();
-            } else {
-                throw new Error('Invalid installment options response');
+            if (!response?.options?.length) {
+                throw new Error('No installment options available');
             }
+
+            // Update state
+            Object.assign(this.screen.state, {
+                selectedCardBrand: cardBrand,
+                installmentOptions: this._formatInstallmentOptions(response.options),
+                totalWithInterest: currentAmount
+            });
+
+            // Update UI
+            this.screen.render();
+
         } catch (error) {
-            console.error('Error loading installments:', error);
             this._resetState();
             this.showError(error.message);
         }
     }
 
-
     /**
-     * Handles installment selection change
-     * Updates order amounts and payment line with interest
-     * @param {Event} ev Change event from select element
-     */
+    * Handles installment selection change
+    * Updates order amounts and payment line with interest
+    * @param {Event} ev Change event from select element
+    */
     onInstallmentChange(ev) {
         const installments = ev.target.value;
         const option = this.state.installmentOptions.find(
@@ -117,61 +175,64 @@ class FiservPaymentHandler {
         if (!option) return;
 
         try {
-            // Update state with selected installment data
-            Object.assign(this.state, {
-                selectedInstallments: option.installments,
-                installmentAmount: parseFloat(option.amount),
-                totalWithInterest: parseFloat(option.total),
-                interestRate: parseFloat(option.rate)
-            });
+            const totalWithInterest = this.originalCardsMethodTotal * option.coefficient;
 
             if (typeof option.coefficient === 'number' && !isNaN(option.coefficient)) {
-                this._updateOrderLinesWithInterest(option.coefficient);
+                // 1. First update state
+                Object.assign(this.state, {
+                    selectedInstallments: option.installments,
+                    installmentAmount: totalWithInterest / parseInt(option.installments),
+                    totalWithInterest: totalWithInterest,
+                    interestRate: parseFloat(option.rate)
+                });
 
-                const totalWithInterest = parseFloat(this.state.totalWithInterest);
-                if (!isNaN(totalWithInterest) && this.selectedPaymentLine) {
-                    // Update the payment line amount
-                    this.selectedPaymentLine.set_amount(totalWithInterest);
-                    this.selectedPaymentLine.set_payment_status("done");
-
-                    // Update the number buffer if it exists
-                    if (this.screen.numberBuffer) {
-                        this.screen.numberBuffer.set(totalWithInterest.toString());
-                    }
+                // 2. Update payment line with new amount
+                const paymentLine = this.currentOrder?.get_selected_paymentline();
+                if (paymentLine) {
+                    paymentLine.set_amount(totalWithInterest);
                 }
-            }
 
-            // Trigger a re-render of the screen
-            this.screen.render();
+                // 3. Calculate new total with all payment methods
+                const totalPaid = this._recalculateOrderTotal();
+
+                const targetTotal = totalPaid;
+
+                // 4. Update order lines with new target total
+                this._updateOrderLinesWithInterest(option.coefficient, targetTotal);
+
+                this.screen.render();
+            }
         } catch (error) {
             console.error('Error processing installment change:', error);
-            this.showError('Error al procesar el cambio de cuotas');
+            this.showError('Error processing installment change');
         }
     }
 
     /**
-        * Updates order lines with interest coefficient
-        * Recalculates totals and updates UI
-        * @param {number} coefficient Interest multiplier
-        */
-    _updateOrderLinesWithInterest(coefficient) {
+    * Updates order lines with interest coefficient
+    * Recalculates totals and updates UI
+    * @param {number} coefficient Interest multiplier
+    */
+    _updateOrderLinesWithInterest(coefficient, targetTotal) {
         const order = this.currentOrder;
         if (!order) return;
 
         const coef = parseFloat(coefficient);
         if (isNaN(coef)) return;
 
-        // Store original total before applying interest
-        if (!this.state.originalTotal) {
-            this.state.originalTotal = order.get_total_with_tax();
-        }
+        const originalOrderTotalToCalc = this.screen.state.originalOrderTotal;
+        const realCoefficient = targetTotal / originalOrderTotalToCalc;
+
+        // console.log('Original Total:', originalOrderTotalToCalc);
+        // console.log('Target total final:', targetTotal);
+        // console.log('Real Coefficient:', realCoefficient);
 
         order.get_orderlines().forEach(line => {
             try {
                 if (!line.original_price) {
                     line.original_price = line.get_unit_price();
                 }
-                line.set_unit_price(line.original_price * coef);
+                line.set_unit_price(line.original_price * realCoefficient);
             } catch (error) {
                 console.error('Error processing line:', error);
             }
@@ -179,143 +240,106 @@ class FiservPaymentHandler {
 
         order.recomputeOrderData();
 
-        this.state.totalWithInterest = order.amount_total;
-
-        // Notify payment interface of total change
-        this.screen.payment_interface?.update_payment_summary({
-            total: this.state.totalWithInterest,
-            total_paid: order.get_total_paid(),
-            remaining: order.get_due()
-        });
-
-        this._forcePaymentSummaryUpdate();
-    }
-
-    /**
-        * Forces payment summary update in UI
-        * Updates totals, remaining amount and payment lines
-        */
-    _forcePaymentSummaryUpdate() {
-        if (!this.currentOrder) return;
-
-        try {
-            // Update the state with the latest totals
-            Object.assign(this.screen.state, {
-                totalAmount: this.state.totalWithInterest,
-                remainingAmount: this.currentOrder.get_due(),
-                paymentLines: [...this.currentOrder.payment_ids]
-            });
-
-            // Update the number buffer if it exists
-            if (this.screen.numberBuffer) {
-                this.screen.numberBuffer.set(this.state.totalWithInterest.toString());
-            }
-
-            // Notify the payment interface of the total change
-            this.screen.payment_interface?.update_payment_summary({
-                total: this.state.totalWithInterest,
-                total_paid: this.currentOrder.get_total_paid(),
-                remaining: this.currentOrder.get_due()
-            });
-
-            // Force a re-render of the screen
-            this.screen.render();
-        } catch (error) {
-            console.error('Error updating payment summary:', error);
-            this.showError('Error actualizando el resumen de pago');
+        if (this.screen.numberBuffer) {
+            this.screen.numberBuffer.reset();
+            this.screen.numberBuffer.set(targetTotal.toString());
         }
     }
 
     /**
-        * Updates payment summary with new totals
-        * Handles payment line amount updates
-        */
-    _updatePaymentSummary() {
-        if (!this.currentOrder || !this.selectedPaymentLine) return;
-
-        const paid = this.currentOrder.get_total_paid();
-        const remaining = Math.max(this.state.totalWithInterest - paid, 0);
-
-        // Update order first
-        this.currentOrder.set_total_with_tax(this.state.totalWithInterest);
-
-        this.currentOrder.recomputeOrderData();
-
-        // Update payment line amount
-        this.selectedPaymentLine.set_amount(this.state.totalWithInterest);
-
-        // Trigger order change to refresh UI
-        this.currentOrder.trigger('change', this.currentOrder);
-
-
-        // Notify payment interface
-        this.screen.payment_interface?.update_payment_summary({
-            total: this.state.totalWithInterest,
-            total_paid: paid,
-            remaining: remaining
-        });
-
-        Object.assign(this.screen.state, {
-            totalAmount: this.state.totalWithInterest,
-            remainingAmount: remaining,
-            paymentLines: [...this.currentOrder.payment_ids]
-        });
-
-        this.screen.render();
-    }
-
-    /**
-        * Updates payment line amount
-        * Handles amount validation and UI updates
-        * @param {number|false} amount New amount or false to get from buffer
-        */
-    updatePaymentLine(amount = false) {
-        this.updateReferences();
-        if (amount === false) {
-            amount = this.screen.numberBuffer.getFloat();
-        }
-
-        if (amount === null) {
-            this._resetPrices();
-            this.screen.deletePaymentLine(this.screen.selectedPaymentLine.uuid);
-            return;
-        }
-
-        const maxAmount = this.state.totalWithInterest || this.currentOrder.get_total_with_tax();
-        if (amount > maxAmount) {
-            amount = maxAmount;
-            this.screen.numberBuffer.set(maxAmount.toString());
-            this._showMaxAmountError();
-        }
-
-        // Update the payment line amount
-        this.screen.selectedPaymentLine.set_amount(amount);
-
-        // Force a re-render of the screen
-        this.screen.render();
-    }
-
-
-    /**
-     * Resets prices to original values
-     * Clears interest calculations
+     * Recalculate the order total considering all payment methods..
      */
-    _resetPrices() {
+    _recalculateOrderTotal() {
         const order = this.currentOrder;
         if (!order) return;
 
-        order.get_orderlines().forEach(line => {
-            try {
-                if (line.original_price) {
-                    line.set_unit_price(line.original_price);
-                    line.setLinePrice();
-                }
-            } catch (error) {
-                console.error('Error resetting price:', error);
-            }
-        });
+        let totalPaid = 0;
 
-        order.recomputeOrderData();
+        // Add validation for payment_ids
+        if (order.payment_ids && Array.isArray(order.payment_ids)) {
+            order.payment_ids.forEach(paymentLine => {
+                // console.log('Processing payment line:', paymentLine);
+                if (paymentLine && typeof paymentLine.get_amount === 'function') {
+                    const amount = paymentLine.get_amount();
+                    // console.log('To pay:', amount);
+                    totalPaid += amount;
+                }
+            });
+        }
+
+        // Update the total to pay on the order
+        if (typeof order.set_total_paid === 'function') {
+            order.set_total_paid(totalPaid);
+        }
+
+        // Recalculate order data
+        if (typeof order.recomputeOrderData === 'function') {
+            order.recomputeOrderData();
+        }
+        this.screen.render();
+
+        //console.log('Total amount to pay:', totalPaid);
+
+        return totalPaid;
+    }
+
+    /**
+     *  Updates the payment line amount in POS orders.
+     *    Key features:
+     *    - Manages payment line amount updates with or without specified amounts
+     *    - Calculates interest for installment payments
+     *    - Updates order totals after payment modifications
+     *    - Handles number buffer integration for manual amount entry
+     *    - Supports automatic due amount calculation when no specific amount is provided
+     */
+    updatePaymentLine(amount = false) {
+        this.updateReferences();
+
+        if (!this.selectedPaymentLine) {
+            return;
+        }
+
+        // If no specific amount is provided, get it from the buffer or the remaining amount
+        if (amount === false) {
+            amount = this.screen.numberBuffer.get()
+                ? this.screen.numberBuffer.getFloat()
+                : this.currentDueAmount;
+        }
+
+        // Calculate interest if there are selected installments
+        if (this.state.selectedCardBrand && this.state.selectedInstallments) {
+            const option = this.state.installmentOptions.find(
+                opt => opt.installments.toString() === this.state.selectedInstallments.toString()
+            );
+
+            if (option) {
+                amount = amount * option.coefficient;
+            }
+        }
+
+        // Update the amount on the payment line
+        if (amount !== null) {
+            this.selectedPaymentLine.set_amount(amount);
+        }
+
+        // Recalculate the order total
+        this._recalculateOrderTotal();
+        // console.log('Total recalculado después de actualizar la línea de pago.');
+    }
+
+    /**
+    * Updates payment line amount
+    * Handles amount validation and UI updates
+    * @param {number|false} amount New amount or false to get from buffer
+    */
+    get currentDueAmount() {
+        const order = this.currentOrder;
+        if (!order) return 0;
+
+        // Get remaining amount after other payments
+        const total = order.get_total_with_tax();
+        const paid = order.get_total_paid();
+        return total - paid;
     }
 
     /**
@@ -372,20 +396,54 @@ class FiservPaymentHandler {
     }
 
     /**
+     * Resets prices to original values
+     * Clears interest calculations
+     */
+    _resetPrices() {
+        const order = this.currentOrder;
+        if (!order) return;
+
+        // Restore original prices
+        order.get_orderlines().forEach(line => {
+            try {
+                if (line.original_price) {
+                    line.set_unit_price(line.original_price);
+                    delete line.original_price;
+                    line.setLinePrice();
+                }
+            } catch (error) {
+                console.error('Error resetting price:', error);
+            }
+        });
+        // Recalculate the order
+        order.recomputeOrderData();
+    }
+
+    /**
      * Resets payment state to initial values
      */
     _resetState() {
-        Object.assign(this.state, {
+        // Reset the screen status
+        Object.assign(this.screen.state, {
             selectedCardBrand: null,
             installmentOptions: [],
             selectedInstallments: null,
             installmentAmount: 0,
             totalWithInterest: 0,
-            originalTotal: 0,
             interestRate: 0,
             isVisible: true,
             originalPrices: new Map()
         });
+
+        // Reset the payment line amount to the original
+        const paymentLine = this.selectedPaymentLine;
+        if (paymentLine) {
+            const originalAmount = this.baseAmount;
+            paymentLine.set_amount(originalAmount);
+        }
+
+        // Recalculate totals
+        this._recalculateOrderTotal();
 
         // Reset UI elements if they exist
         if (this.screen.el) {
@@ -451,7 +509,7 @@ class FiservPaymentHandler {
  * - interestRate: Current interest rate
  * - cardBrands: Available card brands
  * - isVisible: Form visibility flag
- * - originalTotal: Original amount before interest
+ * - originalCardsMethodTotal: Original amount before interest
  * - originalPrices: Map of original line prices
  * 
  * @private
@@ -469,7 +527,7 @@ patch(PaymentScreen.prototype, {
             interestRate: 0,
             cardBrands: [],
             isVisible: false,
-            originalTotal: 0,
+            originalOrderTotal: 0,
             originalPrices: new Map()
         });
         this.fiservHandler = new FiservPaymentHandler(this);
@@ -490,22 +548,6 @@ patch(PaymentScreen.prototype, {
             await this.fiservHandler.initialize();
             this.render();
         }
-    },
-
-    /**
-     * Updates the selected payment line amount.
-     * Handles special case for card payments through Fiserv handler.
-     * 
-     * @override
-     * @param {number|false} amount - New amount or false to get from buffer
-     * @returns {Promise<void>}
-     */
-    updateSelectedPaymentline(amount = false) {
-        const paymentLine = this.currentOrder?.selected_paymentline;
-        if (paymentLine?.payment_method.name === 'Tarjetas') {
-            return this.fiservHandler.updatePaymentLine(amount);
-        }
-        return super.updateSelectedPaymentline(amount);
     },
 
     /**
