@@ -36,7 +36,7 @@
                         <!-- Original Price -->
                         <div class="original-price d-flex justify-content-between">
                             <span class="fw-bold">Precio en efectivo:</span>
-                            <span t-esc="_formatCurrency(state.originalTotal || currentOrder.get_total_with_tax())"/>
+                            <span t-esc="_formatCurrency(fiservHandler.originalCardsMethodTotal)"/>
                         </div>
                         <hr class="my-2"/>
                         <!-- Installment Info -->
