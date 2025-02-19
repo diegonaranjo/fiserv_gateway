@@ -49,9 +49,6 @@ Payment Experience 🛍️
 
 Secure payment processing on Fiserv's platform
 
-
-
-
 Configuration ⚙️
 
 Configure your Fiserv credentials:
@@ -124,15 +121,6 @@ Pending Improvements 🔧
 - [ ] Enhanced admin interface for installment and interest rate management
 
 - [ ] Optional: Support for PCI Compliance direct payment without redirection to Fiserv site
-
-Known Issues 🐛
-
-- [ ] POS Payment: Final amount with installments not updating correctly in payment summary when selecting card and installment plan
-![POS Summary payments](https://github.com/diegonaranjo/fiserv_gateway/blob/main/wiki/images/pos_payment_total.png)
-
-Development Status ⚡
-
-This is a beta version under active development. The module is functional for basic payment processing but requires completion of the items listed above before being considered production-ready.
 
 Support & Issues 🆘
 
